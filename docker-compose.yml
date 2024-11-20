@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  app:
+    image: cargo-back  # You can still specify the image name, this is optional if you want it tagged with the name you choose
+    container_name: cargo-back
+    build:
+      context: .  # Use the current directory as the build context
+      dockerfile: Dockerfile  # The Dockerfile to use for the build
+    ports:
+      - "5000:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://34.175.15.238:3306/cargo_jee
+      SPRING_DATASOURCE_USERNAME: khalid
+      SPRING_DATASOURCE_PASSWORD: khalid1234
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    volumes:
+      - ./logs:/app/logs # Optional for logs
