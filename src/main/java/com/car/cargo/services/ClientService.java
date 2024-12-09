@@ -16,9 +16,13 @@ public class ClientService {
     public Client addClient(Client client) {
         return clientRepository.save(client); // Enregistre le client dans la base de données
     }
+    public Client findByEmail(String email) {
+        return clientRepository.findByEmail(email);
+    }
     @Autowired
     private final BCryptPasswordEncoder encoder;
     public ClientService(BCryptPasswordEncoder encoder) {
         this.encoder = encoder;
     }
+    
 }
