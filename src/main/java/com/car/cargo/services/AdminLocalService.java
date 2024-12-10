@@ -1,0 +1,82 @@
+package com.car.cargo.services;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import com.car.cargo.models.AdminLocal;
+import com.car.cargo.models.VerificationCodeAdminLocal;
+import com.car.cargo.repository.AdminLocalRepository;
+import com.car.cargo.repository.VerificationCodeAdminLocalRepository;
+
+@Service
+public class AdminLocalService {
+
+    @Autowired
+    private AdminLocalRepository adminLocalRepository;
+    
+    @Autowired
+    private VerificationCodeAdminLocalRepository verificationCodeAdminLocalRepository;
+    
+    @Autowired
+    private EmailService emailService;
+    
+    @Autowired
+    private BCryptPasswordEncoder passwordEncoder;
+
+    // Ajouter un nouvel AdminLocal
+    public AdminLocal addAdminLocal(AdminLocal adminLocal) {
+        return adminLocalRepository.save(adminLocal);
+    }
+
+    // Trouver un AdminLocal par email
+    public AdminLocal findByEmail(String email) {
+        return adminLocalRepository.findByEmail(email);
+    }
+
+    // Mettre à jour un AdminLocal
+    public AdminLocal updateAdminLocal(AdminLocal adminLocal) {
+        return adminLocalRepository.save(adminLocal);
+    }
+    
+    public void sendVerificationCode(AdminLocal adminLocal) {
+        // Generate a 6-digit random code
+        String code = String.format("%06d", (int) (Math.random() * 1_000_000));
+
+        // Create and save the VerificationCodeAdminLocal entity
+        VerificationCodeAdminLocal verificationCode = new VerificationCodeAdminLocal();
+        verificationCode.setCode(code);
+        verificationCode.setAdminLocal(adminLocal);
+        verificationCodeAdminLocalRepository.save(verificationCode);
+
+        // Send the code via email
+        emailService.sendEmail(
+            adminLocal.getEmail(),
+            "Your Verification Code",
+            "Your verification code is: " + code
+        );
+    }
+    
+    public boolean verifyCode(AdminLocal adminLocal, String code) {
+        // Find the most recent verification code for the admin
+        VerificationCodeAdminLocal latestCode = verificationCodeAdminLocalRepository
+                .findTopByAdminLocalOrderByCreatedAtDesc(adminLocal);
+
+        if (latestCode == null || !latestCode.getCode().equals(code)) {
+            return false; // Code does not match
+        }
+
+        return true; // Code matches
+    }
+    
+    public void changePassword(AdminLocal adminLocal, String newPassword) {
+        // Encrypt the new password
+        String encodedPassword = passwordEncoder.encode(newPassword);
+        adminLocal.setPassword(encodedPassword);
+
+        // Save the updated admin
+        adminLocalRepository.save(adminLocal);
+    }
+
+
+}

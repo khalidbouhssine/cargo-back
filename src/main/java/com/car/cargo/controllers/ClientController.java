@@ -62,7 +62,7 @@ public class ClientController {
         Client savedClient = clientService.addClient(client);
         return ResponseEntity.status(HttpStatus.CREATED).body(savedClient);
     }
-    //route 
+    //route pour login par client 
     @PostMapping("/login")
     public ResponseEntity<Map<String, String>> login(@RequestBody Map<String, String> loginRequest) {
         String email = loginRequest.get("email");
