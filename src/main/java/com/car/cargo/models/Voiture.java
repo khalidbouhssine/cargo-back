@@ -39,6 +39,9 @@ public class Voiture {
     
     @Column(name = "dateFabrication", updatable = false)
     private LocalDateTime dateFabrication;
+    
+    @Column(name = "imagevoiture", nullable = false)
+    private Long imagevoiture;
 
     @PrePersist
     protected void onCreate() {

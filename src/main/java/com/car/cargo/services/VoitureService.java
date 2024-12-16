@@ -1,6 +1,11 @@
 package com.car.cargo.services;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import com.car.cargo.models.Voiture;
 import com.car.cargo.repository.VoitureRepository;
@@ -40,5 +45,19 @@ public class VoitureService {
     }
     public Iterable<Voiture> getAllVoitures() {
         return voitureRepository.findAll(); // Assuming you have a repository for Voiture
+    }
+    public Map<String, Object> getAllVoituresWithPagination(int page, int size) {
+        // Utiliser PageRequest pour gérer la pagination
+        PageRequest pageRequest = PageRequest.of(page, size);
+        Page<Voiture> voiturePage = voitureRepository.findAll(pageRequest);
+
+        // Préparer le résultat
+        Map<String, Object> result = new HashMap<>();
+        result.put("voitures", voiturePage.getContent()); // Liste des voitures de la page actuelle
+        result.put("totalElements", voiturePage.getTotalElements()); // Nombre total d'éléments
+        result.put("totalPages", voiturePage.getTotalPages()); // Nombre total de pages
+        result.put("currentPage", voiturePage.getNumber()); // Page actuelle
+
+        return result;
     }
 }

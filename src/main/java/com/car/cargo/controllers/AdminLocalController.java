@@ -19,6 +19,7 @@ import io.jsonwebtoken.SignatureAlgorithm;
 
 @RestController
 @RequestMapping("/adminLocal")
+@CrossOrigin(origins = "*")
 public class AdminLocalController {
 
     @Autowired

@@ -29,6 +29,7 @@ import io.jsonwebtoken.SignatureAlgorithm;
 
 @RestController
 @RequestMapping("/clients")
+@CrossOrigin(origins = "*")
 public class ClientController {
     @Autowired
     private ClientService clientService;
