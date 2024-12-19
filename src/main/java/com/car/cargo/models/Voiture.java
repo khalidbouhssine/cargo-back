@@ -7,7 +7,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.Data;
 
@@ -15,7 +14,7 @@ import lombok.Data;
 @Entity
 @Table(name = "Voiture")
 public class Voiture {
-	@Id
+    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long idVoiture;
 
@@ -31,20 +30,15 @@ public class Voiture {
     @Column(name = "status", nullable = false, length = 15)
     private String status;
 
-    @Column(name = "pricePerDay", nullable =false)
+    @Column(name = "pricePerDay", nullable = false)
     private double pricePerDay;
-    
-    @Column(name = "kolometrage", nullable =false)
+
+    @Column(name = "kolometrage", nullable = false)
     private double kolometrage;
-    
-    @Column(name = "dateFabrication", updatable = false)
+
+    @Column(name = "dateFabrication", nullable = false, updatable = false)
     private LocalDateTime dateFabrication;
-    
+
     @Column(name = "imagevoiture", nullable = false)
     private Long imagevoiture;
-
-    @PrePersist
-    protected void onCreate() {
-        this.dateFabrication = LocalDateTime.now();
-    }
 }

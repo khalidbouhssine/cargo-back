@@ -1,5 +1,6 @@
 package com.car.cargo.controllers;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,33 +46,25 @@ public class VoitureController {
                                          @RequestParam("status") String status,
                                          @RequestParam("pricePerDay") double pricePerDay,
                                          @RequestParam("kolometrage") double kolometrage,
+                                         @RequestParam("dateFabrication") String dateFabrication, // Nouvelle entrée pour la date
                                          @RequestParam("image") MultipartFile image) {
         try {
-            // Verify and decode the token
+            // Vérifier et décoder le token
             Claims claims = Jwts.parser()
                     .setSigningKey(SECRET_KEY.getBytes())
                     .parseClaimsJws(token.replace("Bearer ", ""))
                     .getBody();
 
-            // Get the email from the token
+            // Obtenir l'email depuis le token
             String email = claims.getSubject();
 
-            // Check if the email belongs to an admin
+            // Vérifier si l'email appartient à un admin
             AdminGlobal adminGlobal = adminGlobalService.findByEmail(email);
             if (adminGlobal == null) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Unauthorized: Admin role required"));
             }
 
-            System.out.println("Received request to add a new car:");
-            System.out.println("Brand: " + brand);
-            System.out.println("Model: " + model);
-            System.out.println("Licence plate: " + licenceplate);
-            System.out.println("Status: " + status);
-            System.out.println("Price per day: " + pricePerDay);
-            System.out.println("Kilometrage: " + kolometrage);
-            System.out.println("Image: " + image.getOriginalFilename());
-
-            // Create a new Voiture object
+            // Création de la nouvelle voiture
             Voiture voiture = new Voiture();
             voiture.setBrand(brand);
             voiture.setModel(model);
@@ -79,30 +72,33 @@ public class VoitureController {
             voiture.setStatus(status);
             voiture.setPricePerDay(pricePerDay);
             voiture.setKolometrage(kolometrage);
+            
+            // Convertir la dateFabrication reçue en String en LocalDateTime
+            voiture.setDateFabrication(LocalDateTime.parse(dateFabrication)); // Parse la date en LocalDateTime
 
-            // Handle the image upload by calling the uploadProfileImage endpoint
+            // Gestion du téléchargement de l'image
             if (image != null && !image.isEmpty()) {
                 System.out.println("Processing image upload...");
 
-                // Create a RestTemplate to call the image upload API
+                // Création d'un RestTemplate pour appeler l'API de téléchargement d'image
                 RestTemplate restTemplate = new RestTemplate();
                 HttpHeaders headers = new HttpHeaders();
-                headers.set("Authorization", token); // Add the authorization token
+                headers.set("Authorization", token); // Ajouter le token d'autorisation
 
-                // Prepare the multipart request
+                // Préparer la requête multipart
                 MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
                 bodyBuilder.part("image", image.getResource());
 
                 HttpEntity<MultiValueMap<String, HttpEntity<?>>> requestEntity = new HttpEntity<>(bodyBuilder.build(), headers);
-                String uploadUrl = "http://localhost:8081/api/upload"; // Adjust to your upload service URL
+                String uploadUrl = "http://localhost:8081/api/upload"; // URL de votre service de téléchargement
 
-                // Call the image upload API
+                // Appeler l'API de téléchargement d'image
                 ResponseEntity<Map> response = restTemplate.postForEntity(uploadUrl, requestEntity, Map.class);
                 if (response.getStatusCode() != HttpStatus.OK) {
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to upload image"));
                 }
 
-                // Extract the image ID from the response
+                // Extraire l'ID de l'image depuis la réponse
                 Map<String, Object> responseBody = response.getBody();
                 String imageId = responseBody != null ? (String) responseBody.get("message") : null;
 
@@ -110,14 +106,14 @@ public class VoitureController {
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Invalid response from upload service"));
                 }
 
-                // Set the image ID in the Voiture object
+                // Définir l'ID de l'image dans l'objet Voiture
                 voiture.setImagevoiture(Long.parseLong(imageId));
                 System.out.println("Image uploaded successfully with ID: " + imageId);
             } else {
                 System.out.println("No image provided.");
             }
 
-            // Save the Voiture object
+            // Sauvegarder la voiture
             Voiture newVoiture = voitureService.addVoiture(voiture);
             System.out.println("Voiture added successfully with ID: " + newVoiture.getIdVoiture());
 
@@ -127,12 +123,11 @@ public class VoitureController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             System.out.println("An error occurred while adding the car: " + e.getMessage());
-            e.printStackTrace(); // Print stack trace for debugging
+            e.printStackTrace(); // Afficher la trace de l'exception pour le débogage
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", "An error occurred while adding the car.", "error", e.getMessage()));
         }
     }
-
 
 
  //  route pour supprimer une voiture par ID
