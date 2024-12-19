@@ -79,14 +79,38 @@ public class VoitureController {
             voiture.setStatus(status);
             voiture.setPricePerDay(pricePerDay);
             voiture.setKolometrage(kolometrage);
-            
-            // Handle the image file (simulated)
+
+            // Handle the image upload by calling the uploadProfileImage endpoint
             if (image != null && !image.isEmpty()) {
                 System.out.println("Processing image upload...");
 
-                // Simulate saving image and getting the image ID
-                // (Replace this with your actual image upload logic)
-                String imageId = "12345"; // Mocked image ID for now
+                // Create a RestTemplate to call the image upload API
+                RestTemplate restTemplate = new RestTemplate();
+                HttpHeaders headers = new HttpHeaders();
+                headers.set("Authorization", token); // Add the authorization token
+
+                // Prepare the multipart request
+                MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
+                bodyBuilder.part("image", image.getResource());
+
+                HttpEntity<MultiValueMap<String, HttpEntity<?>>> requestEntity = new HttpEntity<>(bodyBuilder.build(), headers);
+                String uploadUrl = "http://localhost:8081/api/upload"; // Adjust to your upload service URL
+
+                // Call the image upload API
+                ResponseEntity<Map> response = restTemplate.postForEntity(uploadUrl, requestEntity, Map.class);
+                if (response.getStatusCode() != HttpStatus.OK) {
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to upload image"));
+                }
+
+                // Extract the image ID from the response
+                Map<String, Object> responseBody = response.getBody();
+                String imageId = responseBody != null ? (String) responseBody.get("message") : null;
+
+                if (imageId == null) {
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Invalid response from upload service"));
+                }
+
+                // Set the image ID in the Voiture object
                 voiture.setImagevoiture(Long.parseLong(imageId));
                 System.out.println("Image uploaded successfully with ID: " + imageId);
             } else {
@@ -108,6 +132,7 @@ public class VoitureController {
                     .body(Map.of("message", "An error occurred while adding the car.", "error", e.getMessage()));
         }
     }
+
 
 
  //  route pour supprimer une voiture par ID
