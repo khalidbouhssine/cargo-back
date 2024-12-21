@@ -1,6 +1,9 @@
 package com.car.cargo.controllers;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -196,10 +199,12 @@ public class VoitureController {
             }
 
             // Si l'utilisateur est valide, récupérer les voitures avec pagination
-            System.out.println("----------------" + page + "---------------");
             Map<String, Object> result = voitureService.getAllVoituresWithPagination(page, size);
 
-            return ResponseEntity.ok(result);
+            // Récupérer la liste des voitures filtrées depuis le Map
+            List<Map<String, Object>> voitures = (List<Map<String, Object>>) result.get("voitures");
+
+            return ResponseEntity.ok(result); // Retourner la réponse complète avec pagination
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

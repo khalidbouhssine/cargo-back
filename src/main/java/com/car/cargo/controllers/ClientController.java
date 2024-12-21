@@ -16,9 +16,13 @@ import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.util.MultiValueMap;
 
+import com.car.cargo.models.AdminGlobal;
+import com.car.cargo.models.AdminLocal;
 import com.car.cargo.models.Client;
 import com.car.cargo.models.VerificationCode;
+import com.car.cargo.repository.AdminLocalRepository;
 import com.car.cargo.repository.VerificationCodeRepository;
+import com.car.cargo.services.AdminGlobalService;
 import com.car.cargo.services.ClientService;
 import com.car.cargo.services.EmailService;
 
@@ -42,6 +46,10 @@ public class ClientController {
     
     @Autowired
     private VerificationCodeRepository verificationCodeRepository;
+    @Autowired
+    private AdminGlobalService adminGlobalRepository;
+    @Autowired
+    private AdminLocalRepository adminLocalRepository;
     
     private static final String SECRET_KEY = "VFAbCGus7Mr0laauDiYfHsNgkUHXfgaok10ior2lYwxsuetda/uf4l4QYzfGtAyxylRFGpkzfMR44Vey0qGcUg=="; // Replace with your secret key
 
@@ -272,6 +280,40 @@ public class ClientController {
             return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+    @GetMapping("/allClients")
+    public ResponseEntity<?> getAllClients(
+            @RequestHeader("Authorization") String token,
+            @RequestParam int page,
+            @RequestParam int size) {
+        try {
+            // Vérifier et décoder le token
+            Claims claims = Jwts.parser()
+                    .setSigningKey(SECRET_KEY.getBytes())
+                    .parseClaimsJws(token.replace("Bearer ", ""))
+                    .getBody();
+
+            // Récupérer l'email depuis le token
+            String email = claims.getSubject();
+
+            // Vérifier si l'email appartient à un admin global ou local
+            AdminGlobal adminGlobal = adminGlobalRepository.findByEmail(email);
+            AdminLocal adminLocal = adminLocalRepository.findByEmail(email);
+
+            if (adminGlobal == null && adminLocal == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Access denied, not an admin"));
+            }
+
+            // Récupérer les clients avec pagination
+            Map<String, Object> result = clientService.getClientsWithPagination(page, size);
+
+            return ResponseEntity.ok(result); // Retourner la réponse complète avec pagination
+
+        } catch (JwtException | IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired token"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "An error occurred while fetching clients"));
         }
     }
 
