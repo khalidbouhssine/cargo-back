@@ -1,6 +1,12 @@
 package com.car.cargo.services;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -77,6 +83,19 @@ public class AdminLocalService {
         // Save the updated admin
         adminLocalRepository.save(adminLocal);
     }
+    public Map<String, Object> getAllAdminLocalsWithPagination(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<AdminLocal> adminLocalsPage = adminLocalRepository.findAll(pageable);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("adminsLocaux", adminLocalsPage.getContent());
+        result.put("currentPage", adminLocalsPage.getNumber());
+        result.put("totalItems", adminLocalsPage.getTotalElements());
+        result.put("totalPages", adminLocalsPage.getTotalPages());
+
+        return result;
+    }
+
 
 
 }

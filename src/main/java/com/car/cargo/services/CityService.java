@@ -1,5 +1,7 @@
 package com.car.cargo.services;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -33,8 +35,7 @@ public class CityService {
         return true; // City deleted successfully
     }
  // Fetch all cities
-    public Iterable<City> getAllCities() {
-        return cityRepository.findAll();
+    public List<City> getAllCities() {
+        return cityRepository.findAll(); // Assurez-vous que `findAll` retourne une List
     }
-
 }

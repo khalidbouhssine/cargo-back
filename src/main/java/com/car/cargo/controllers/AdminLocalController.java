@@ -1,6 +1,7 @@
 package com.car.cargo.controllers;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,7 +10,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import com.car.cargo.models.AdminGlobal;
 import com.car.cargo.models.AdminLocal;
+import com.car.cargo.services.AdminGlobalService;
 import com.car.cargo.services.AdminLocalService;
 
 import io.jsonwebtoken.Claims;
@@ -24,6 +27,8 @@ public class AdminLocalController {
 
     @Autowired
     private AdminLocalService adminLocalService;
+    @Autowired
+    private AdminGlobalService adminGlobalRepository;
 
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
@@ -159,6 +164,62 @@ public class AdminLocalController {
         adminLocalService.changePassword(adminLocal, newPassword);
         return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
     }
+    
+    @GetMapping("/displayall")
+    public ResponseEntity<?> getAllAdminLocals(
+            @RequestHeader("Authorization") String token,
+            @RequestParam int page,
+            @RequestParam int size) {
+        try {
+            // Vérifier si le token est présent et commence par "Bearer "
+            if (token == null || !token.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("message", "Token manquant ou invalide."));
+            }
+
+            // Vérifier et décoder le token
+            Claims claims;
+            try {
+                claims = Jwts.parser()
+                        .setSigningKey(SECRET_KEY.getBytes()) // Utiliser votre clé secrète
+                        .parseClaimsJws(token.replace("Bearer ", ""))
+                        .getBody();
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("message", "Token invalide."));
+            }
+
+            // Récupérer l'email depuis le token
+            String email = claims.getSubject();
+
+            // Vérifier si l'email appartient à un admin global
+            AdminGlobal adminGlobal = adminGlobalRepository.findByEmail(email);
+
+            if (adminGlobal == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("message", "Accès refusé : cette opération est réservée aux administrateurs globaux."));
+            }
+
+            // Validation des paramètres page et size
+            if (page < 0 || size <= 0) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("message", "Les paramètres 'page' et 'size' doivent être positifs."));
+            }
+
+            // Récupérer les administrateurs locaux avec pagination
+            Map<String, Object> result = adminLocalService.getAllAdminLocalsWithPagination(page, size);
+
+            // Récupérer la liste des administrateurs locaux filtrés depuis le Map
+            List<Map<String, Object>> adminsLocaux = (List<Map<String, Object>>) result.get("adminsLocaux");
+
+            return ResponseEntity.ok(result); // Retourner la réponse complète avec pagination
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Une erreur s'est produite lors de la récupération des administrateurs locaux."));
+        }
+    }
+
 
     
 }

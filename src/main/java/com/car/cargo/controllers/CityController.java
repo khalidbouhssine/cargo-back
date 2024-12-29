@@ -6,9 +6,17 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.car.cargo.models.City;
+import com.car.cargo.models.Client;
 import com.car.cargo.services.CityService;
+import com.car.cargo.services.ClientService;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/city")
@@ -17,6 +25,9 @@ public class CityController {
 
     @Autowired
     private CityService cityService;
+    @Autowired
+    private ClientService clientService;
+    private static final String SECRET_KEY = "VFAbCGus7Mr0laauDiYfHsNgkUHXfgaok10ior2lYwxsuetda/uf4l4QYzfGtAyxylRFGpkzfMR44Vey0qGcUg==";
 
  // Route to create a new city
     @PostMapping("/create")
@@ -48,9 +59,42 @@ public class CityController {
 
         return ResponseEntity.ok(Map.of("message", "City deleted successfully"));
     }
-    // Route to fetch all cities
     @GetMapping("/displayallcity")
-    public ResponseEntity<?> getAllCities() {
-        return ResponseEntity.ok(cityService.getAllCities());
+    public ResponseEntity<?> getCitiesByToken(@RequestHeader("Authorization") String token) {
+        try {
+            // Vérifier et décoder le token
+            Claims claims = Jwts.parser()
+                    .setSigningKey(SECRET_KEY.getBytes()) // Utilisation de la clé secrète
+                    .parseClaimsJws(token.replace("Bearer ", "")) // Retirer le préfixe "Bearer "
+                    .getBody();
+
+            // Récupérer l'email depuis le token
+            String email = claims.getSubject();
+
+            // Vérifier si un client existe avec cet email
+            Client client = clientService.findByEmail(email);
+
+            if (client == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Invalid token or client not found"));
+            }
+
+            // Si le client est valide, récupérer toutes les villes (id et nameCity uniquement)
+            List<Map<String, Object>> cities = cityService.getAllCities().stream()
+                    .map(city -> {
+                        Map<String, Object> cityMap = new HashMap<>();
+                        cityMap.put("id", city.getIdCity());
+                        cityMap.put("nameCity", city.getNameCity());
+                        return cityMap;
+                    })
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(cities);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Invalid token or unable to process token"));
+        }
     }
+
 }
