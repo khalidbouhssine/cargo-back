@@ -20,9 +20,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.car.cargo.models.AdminGlobal;
 import com.car.cargo.models.AdminLocal;
+import com.car.cargo.models.City;
+import com.car.cargo.models.Client;
+import com.car.cargo.models.Reservation;
 import com.car.cargo.models.Voiture;
 import com.car.cargo.repository.AdminLocalRepository;
 import com.car.cargo.services.AdminGlobalService;
+import com.car.cargo.services.ReservationService;
 import com.car.cargo.services.VoitureService;
 
 import io.jsonwebtoken.Claims;
@@ -34,6 +38,10 @@ import io.jsonwebtoken.Jwts;
 public class VoitureController {
     @Autowired
     private VoitureService voitureService;
+    
+    @Autowired
+    private ReservationService reservationService;
+    
     @Autowired
     private AdminGlobalService adminGlobalRepository;
     @Autowired
@@ -75,7 +83,7 @@ public class VoitureController {
             voiture.setStatus(status);
             voiture.setPricePerDay(pricePerDay);
             voiture.setKolometrage(kolometrage);
-            
+
             // Convertir la dateFabrication reçue en String en LocalDateTime
             voiture.setDateFabrication(LocalDateTime.parse(dateFabrication)); // Parse la date en LocalDateTime
 
@@ -120,6 +128,33 @@ public class VoitureController {
             Voiture newVoiture = voitureService.addVoiture(voiture);
             System.out.println("Voiture added successfully with ID: " + newVoiture.getIdVoiture());
 
+            // Créer une réservation par défaut pour cette voiture (idClient = 1)
+            Reservation defaultReservation = new Reservation();
+            defaultReservation.setVoiture(newVoiture);
+            
+            // Créer un objet City et affecter avec setters
+            City startCity = new City();
+            startCity.setIdCity(1L);  // L'id de la ville de départ
+            defaultReservation.setStartCity(startCity);
+
+            City endCity = new City();
+            endCity.setIdCity(1L);    // L'id de la ville de fin
+            defaultReservation.setEndCity(endCity);
+            
+            defaultReservation.setStatus("PENDING"); // Statut par défaut
+            defaultReservation.setStartDate(LocalDateTime.now().plusDays(1)); // Exemple de date de début
+            defaultReservation.setEndDate(LocalDateTime.now().plusDays(2)); // Exemple de date de fin
+
+            // Créer un objet Client et affecter avec setter
+            Client client = new Client();
+            client.setIdClient(1L); // Utilisation d'un client par défaut
+            defaultReservation.setIdClient(client);
+
+            // Sauvegarder la réservation
+            reservationService.createReservation(defaultReservation);
+            System.out.println("Default reservation created for the car with ID: " + newVoiture.getIdVoiture());
+
+            // Retourner la réponse
             return ResponseEntity.status(HttpStatus.CREATED).body(newVoiture);
         } catch (IllegalArgumentException e) {
             System.out.println("Illegal argument exception: " + e.getMessage());
