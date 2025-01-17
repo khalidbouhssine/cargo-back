@@ -182,13 +182,50 @@ public class VoitureController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Une erreur s'est produite lors de la suppression de la voiture."));
         }
     }
- // Route pour afficher une voiture par ID
+ // Route pour afficher une voiture par ID sans utiliser l'objet Voiture
     @GetMapping("/affichervoiture/{id}")
     public ResponseEntity<?> getVoitureById(@PathVariable Long id) {
         try {
             Voiture voiture = voitureService.getVoitureById(id);
             if (voiture != null) {
-                return ResponseEntity.ok(voiture);
+                // Créer une structure locale pour la voiture
+                Map<String, Object> voitureDetails = new HashMap<>();
+                voitureDetails.put("id", voiture.getIdVoiture());
+                voitureDetails.put("brand", voiture.getBrand());
+                voitureDetails.put("model", voiture.getModel());
+                voitureDetails.put("licencePlate", voiture.getLicenceplate());
+                voitureDetails.put("status", voiture.getStatus());
+                voitureDetails.put("pricePerDay", voiture.getPricePerDay());
+                voitureDetails.put("kilometrage", voiture.getKolometrage());
+                voitureDetails.put("dateFabrication", voiture.getDateFabrication());
+
+                // Vérification si l'image de la voiture existe
+                if (voiture.getImagevoiture() != null) {
+                    Long imageId = voiture.getImagevoiture();
+                    String imageUrl = "http://localhost:8081/api/image/" + imageId;
+                    System.out.println("Fetching image from URL: " + imageUrl); // Log pour débogage
+
+                    // Faire une requête HTTP GET pour récupérer le nom de l'image
+                    try {
+                        RestTemplate restTemplate = new RestTemplate();
+                        ResponseEntity<Map> response = restTemplate.getForEntity(imageUrl, Map.class);
+
+                        if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                            String imageName = (String) response.getBody().get("message");
+                            voitureDetails.put("imageName", imageName); // Ajouter le nom de l'image à la structure
+                        } else {
+                            voitureDetails.put("imageName", "Image not found");
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Error fetching image name for ID: " + imageId + " - " + e.getMessage());
+                        voitureDetails.put("imageName", "Error fetching image");
+                    }
+                } else {
+                    voitureDetails.put("imageName", "No image ID provided");
+                }
+
+                // Retourner la structure contenant les détails de la voiture, y compris le nom de l'image
+                return ResponseEntity.ok(voitureDetails);
             } else {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Voiture introuvable."));
             }
@@ -196,6 +233,7 @@ public class VoitureController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Une erreur s'est produite lors de la récupération de la voiture."));
         }
     }
+
    
     @GetMapping("/all")
     public ResponseEntity<?> getAllVoitures(

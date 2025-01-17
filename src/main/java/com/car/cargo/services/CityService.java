@@ -38,4 +38,14 @@ public class CityService {
     public List<City> getAllCities() {
         return cityRepository.findAll(); // Assurez-vous que `findAll` retourne une List
     }
+    
+    // Méthode pour récupérer une ville par ID
+    public City getCityById(Long id) {
+        return cityRepository.findById(id).orElse(null);
+    }
+
+    // Optionnel : Renommer la méthode en `findById` si vous préférez
+    public City findById(Long id) {
+        return cityRepository.findById(id).orElse(null);
+    }
 }

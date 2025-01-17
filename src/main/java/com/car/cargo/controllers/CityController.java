@@ -5,8 +5,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.car.cargo.models.AdminGlobal;
+import com.car.cargo.models.AdminLocal;
 import com.car.cargo.models.City;
 import com.car.cargo.models.Client;
+import com.car.cargo.services.AdminGlobalService;
+import com.car.cargo.services.AdminLocalService;
 import com.car.cargo.services.CityService;
 import com.car.cargo.services.ClientService;
 
@@ -27,6 +31,13 @@ public class CityController {
     private CityService cityService;
     @Autowired
     private ClientService clientService;
+    
+    @Autowired
+    private AdminLocalService adminLocalService;
+
+    @Autowired
+    private AdminGlobalService adminGlobalService;
+    
     private static final String SECRET_KEY = "VFAbCGus7Mr0laauDiYfHsNgkUHXfgaok10ior2lYwxsuetda/uf4l4QYzfGtAyxylRFGpkzfMR44Vey0qGcUg==";
 
  // Route to create a new city
@@ -71,15 +82,17 @@ public class CityController {
             // Récupérer l'email depuis le token
             String email = claims.getSubject();
 
-            // Vérifier si un client existe avec cet email
+            // Vérifier si un client, adminLocal ou adminGlobal existe avec cet email
             Client client = clientService.findByEmail(email);
+            AdminLocal adminLocal = adminLocalService.findByEmail(email);
+            AdminGlobal adminGlobal = adminGlobalService.findByEmail(email);
 
-            if (client == null) {
+            if (client == null && adminLocal == null && adminGlobal == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "Invalid token or client not found"));
+                        .body(Map.of("error", "Invalid token or no user found (Client, AdminLocal, AdminGlobal)"));
             }
 
-            // Si le client est valide, récupérer toutes les villes (id et nameCity uniquement)
+            // Si un des utilisateurs est trouvé, récupérer toutes les villes (id et nameCity uniquement)
             List<Map<String, Object>> cities = cityService.getAllCities().stream()
                     .map(city -> {
                         Map<String, Object> cityMap = new HashMap<>();
