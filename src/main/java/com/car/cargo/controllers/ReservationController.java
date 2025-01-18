@@ -664,4 +664,68 @@ public class ReservationController {
     }
 
 
+    
+    ///////////////////////////////////////////////////////////////////////////////
+    @GetMapping("/reservationDetails/{id}")
+    public ResponseEntity<?> getReservationDetails(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Long id) {
+        try {
+            // Vérifier et décoder le token
+            Claims claims = Jwts.parser()
+                    .setSigningKey(SECRET_KEY.getBytes())
+                    .parseClaimsJws(token.replace("Bearer ", ""))
+                    .getBody();
+
+            // Récupérer l'email depuis le token
+            String email = claims.getSubject();
+
+            // Vérifier si l'email appartient à un admin global
+            AdminGlobal adminGlobal = adminGlobalRepository.findByEmail(email);
+            if (adminGlobal == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Access denied, not an admin global"));
+            }
+
+            // Récupérer la réservation par ID
+            Reservation reservation = reservationRepository.findById(id).orElse(null);
+            if (reservation == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Reservation not found"));
+            }
+
+            // Récupérer le client associé à la réservation
+            Client client = reservation.getIdClient();
+            if (client == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Client not found"));
+            }
+
+            // Récupérer les villes de départ et d'arrivée
+            City startCity = reservation.getStartCity();
+            City endCity = reservation.getEndCity();
+
+            String startCityName = startCity.getNameCity() ;
+            String endCityName =  endCity.getNameCity() ;
+
+            // Créer une Map contenant les informations demandées
+            Map<String, Object> reservationDetails = new HashMap<>();
+            reservationDetails.put("idReservation", reservation.getIdReservation());
+            reservationDetails.put("idClient", client.getIdClient());
+            reservationDetails.put("nomComplet", client.getNomComplet());  // Ajout du nom complet du client
+            reservationDetails.put("startCity", startCityName);  // Nom de la ville de départ
+            reservationDetails.put("endCity", endCityName);  // Nom de la ville d'arrivée
+            reservationDetails.put("startDate", reservation.getStartDate());
+            reservationDetails.put("endDate", reservation.getEndDate());
+
+            // Retourner les informations de la réservation
+            return ResponseEntity.ok(reservationDetails);
+
+        } catch (JwtException | IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired token"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "An error occurred: " + e.getMessage()));
+        }
+    }
+
+
+
 }
