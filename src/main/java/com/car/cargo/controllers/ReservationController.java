@@ -7,10 +7,12 @@ import com.car.cargo.models.Client;
 import com.car.cargo.models.Payement;
 import com.car.cargo.models.Reservation;
 import com.car.cargo.models.Voiture;
+import com.car.cargo.repository.PayementRepository;
 import com.car.cargo.services.AdminGlobalService;
 import com.car.cargo.services.AdminLocalService;
 import com.car.cargo.services.CityService;
 import com.car.cargo.services.ClientService;
+import com.car.cargo.services.EmailService;
 import com.car.cargo.services.PayementService;
 import com.car.cargo.services.ReservationService;
 import com.car.cargo.services.VoitureService;
@@ -56,6 +58,14 @@ public class ReservationController {
      
      @Autowired
      private VoitureService voitureService;
+     
+     @Autowired
+     private PayementRepository payementRepository;
+     
+     @Autowired
+     private EmailService emailService;
+     
+   
 
     private static final String SECRET_KEY = "VFAbCGus7Mr0laauDiYfHsNgkUHXfgaok10ior2lYwxsuetda/uf4l4QYzfGtAyxylRFGpkzfMR44Vey0qGcUg==";
 
@@ -194,8 +204,7 @@ public class ReservationController {
     
     
     
-    
-    // cette route qui fait la reservation puis le payement dans seul route
+ // Cette route qui fait la réservation puis le paiement dans une seule route
     @PostMapping("/addReservationAndPayment")
     public ResponseEntity<?> addReservationAndPayment(
             @RequestBody Map<String, Object> requestBody,
@@ -283,6 +292,16 @@ public class ReservationController {
             // Sauvegarder le paiement
             Payement createdPayement = payementService.addPayement(payement);
 
+            // Envoyer l'email au client après le paiement réussi
+            String subject = "Your Reservation and Payment Confirmation";
+            String body = String.format("Hello Mr. %s, your reservation has been successfully made for the %s (%s) car, " +
+                            "registration number %s, from %s to %s, for an amount of %.2f DH, from the city of %s to %s.\n\nCarGo Foundation",
+                    client.getNomComplet(), voiture.getBrand(), voiture.getModel(), voiture.getLicenceplate(),
+                    startDate.toLocalDate(), endDate.toLocalDate(), amount, startCity.getNameCity(), endCity.getNameCity());
+
+            // Envoyer l'email
+            emailService.sendEmail(client.getEmail(), subject, body);
+
             // Retourner la réponse combinée
             Map<String, Object> response = new HashMap<>();
             response.put("reservation", createdReservation);
@@ -295,10 +314,255 @@ public class ReservationController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "An error occurred: " + e.getMessage()));
         }
     }
+    
+    @GetMapping("/myReservations")
+    public ResponseEntity<?> getClientReservations(HttpServletRequest request) {
+        try {
+            // Récupérer le token depuis l'en-tête de la requête
+            String token = request.getHeader("Authorization");
+            if (token == null || !token.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Token is missing or invalid"));
+            }
 
-    
-    
-    
-    
+            // Décoder le token JWT
+            Claims claims = Jwts.parser()
+                    .setSigningKey(SECRET_KEY.getBytes())
+                    .parseClaimsJws(token.replace("Bearer ", ""))
+                    .getBody();
+
+            // Récupérer l'email depuis le token
+            String email = claims.getSubject();
+
+            // Récupérer le client par email
+            Client client = clientService.findByEmail(email);
+            if (client == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Client not found"));
+            }
+
+            // Récupérer les réservations du client
+            List<Reservation> reservations = reservationService.findByClient(client);
+            if (reservations.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "No reservations found for the client"));
+            }
+
+            // Créer une liste de Map personnalisée
+            RestTemplate restTemplate = new RestTemplate();
+            List<Map<String, Object>> customReservations = reservations.stream().map(reservation -> {
+                Map<String, Object> reservationMap = new HashMap<>();
+                reservationMap.put("idReservation", reservation.getIdReservation());
+
+                // Ajouter les informations sur la voiture
+                Voiture voiture = reservation.getVoiture();
+                Map<String, Object> voitureMap = new HashMap<>();
+                voitureMap.put("idVoiture", voiture.getIdVoiture());
+                voitureMap.put("brand", voiture.getBrand());
+                voitureMap.put("model", voiture.getModel());
+                voitureMap.put("licenceplate", voiture.getLicenceplate());
+                voitureMap.put("pricePerDay", voiture.getPricePerDay());
+
+                // Vérification et récupération du nom de l'image
+                if (voiture.getImagevoiture() != null) {
+                    Long imageId = voiture.getImagevoiture();
+                    String imageUrl = "http://localhost:8081/api/image/" + imageId;
+
+                    try {
+                        ResponseEntity<Map> response = restTemplate.getForEntity(imageUrl, Map.class);
+                        if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                            String imageName = (String) response.getBody().get("message");
+                            voitureMap.put("imageName", imageName);
+                        } else {
+                            voitureMap.put("imageName", "Image not found");
+                        }
+                    } catch (Exception e) {
+                        voitureMap.put("imageName", "Error fetching image");
+                    }
+                } else {
+                    voitureMap.put("imageName", "No image ID provided");
+                }
+
+                reservationMap.put("voiture", voitureMap);
+
+                // Ajouter les informations des villes de départ et d'arrivée (uniquement le nom)
+                Map<String, Object> startCityMap = Map.of("nameCity", reservation.getStartCity().getNameCity());
+                Map<String, Object> endCityMap = Map.of("nameCity", reservation.getEndCity().getNameCity());
+
+                reservationMap.put("startCity", startCityMap);
+                reservationMap.put("endCity", endCityMap);
+
+                // Ajouter les dates de début et de fin, ainsi que le statut
+                reservationMap.put("startDate", reservation.getStartDate());
+                reservationMap.put("endDate", reservation.getEndDate());
+                reservationMap.put("status", reservation.getStatus());
+
+                // Récupérer le paiement associé à la réservation
+                Payement payement = payementService.findByReservation(reservation);
+                if (payement != null) {
+                    reservationMap.put("amount", payement.getAmount());
+                } else {
+                    reservationMap.put("amount", "No payment found");
+                }
+
+                return reservationMap;
+            }).toList();
+
+            // Retourner les réservations personnalisées
+            return ResponseEntity.ok(customReservations);
+        } catch (JwtException | IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired token"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "An error occurred: " + e.getMessage()));
+        }
+    }
+    //////////////////////////////////////////modifcation de reservation selon la disponibilitte /////////////////////////////////
+      
+    @PutMapping("/updateReservation")
+    public ResponseEntity<?> updateReservation(
+            @RequestBody Map<String, Object> requestBody,
+            HttpServletRequest request) {
+        try {
+            // Récupérer le token depuis l'en-tête de la requête
+            String token = request.getHeader("Authorization");
+            if (token == null || !token.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Token is missing or invalid"));
+            }
+
+            // Décoder le token JWT
+            Claims claims = null;
+            try {
+                claims = Jwts.parser()
+                        .setSigningKey(SECRET_KEY.getBytes())
+                        .parseClaimsJws(token.replace("Bearer ", ""))
+                        .getBody();
+            } catch (JwtException | IllegalArgumentException e) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Invalid or expired token"));
+            }
+
+            // Récupérer l'email depuis le token
+            String email = claims.getSubject();
+            if (email == null || email.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Token does not contain valid email"));
+            }
+
+            // Récupérer le client par email
+            Client client = clientService.findByEmail(email);
+            if (client == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Client not found"));
+            }
+
+            // Extraire l'ID de réservation du body
+            Long idReservation = requestBody.containsKey("idReservation") 
+                    ? Long.valueOf(requestBody.get("idReservation").toString()) 
+                    : null;
+            if (idReservation == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "Reservation ID is required"));
+            }
+
+            // Rechercher la réservation existante
+            Reservation existingReservation = reservationService.findById(idReservation);
+            if (existingReservation == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Reservation not found"));
+            }
+
+            // Vérifier si la réservation appartient au client
+            if (!existingReservation.getIdClient().getEmail().equals(client.getEmail())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "You are not allowed to modify this reservation"));
+            }
+
+            // Extraire les informations envoyées dans la requête pour la mise à jour
+            Long idVoiture = requestBody.containsKey("idVoiture") 
+                    ? Long.valueOf(requestBody.get("idVoiture").toString()) 
+                    : null;
+            String startDateStr = requestBody.containsKey("startDate") 
+                    ? requestBody.get("startDate").toString() 
+                    : null;
+            String endDateStr = requestBody.containsKey("endDate") 
+                    ? requestBody.get("endDate").toString() 
+                    : null;
+            Long endCityId = requestBody.containsKey("endCity") 
+                    ? Long.valueOf(requestBody.get("endCity").toString()) 
+                    : null;
+            Double amount = requestBody.containsKey("amount") 
+                    ? Double.valueOf(requestBody.get("amount").toString()) 
+                    : null;
+
+            // Vérification si l'attribut amount est fourni
+            if (amount == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "Amount is required"));
+            }
+
+            // Convertir les dates de String à LocalDateTime
+            LocalDateTime startDate = (startDateStr != null) 
+                    ? LocalDateTime.parse(startDateStr) 
+                    : existingReservation.getStartDate();
+            LocalDateTime endDate = (endDateStr != null) 
+                    ? LocalDateTime.parse(endDateStr) 
+                    : existingReservation.getEndDate();
+
+            // Vérification des dates
+            if (startDate.isAfter(endDate)) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "Start date must be before end date"));
+            }
+
+            // Récupérer la voiture si l'ID de la voiture a été fourni
+            Voiture voiture = (idVoiture != null) 
+                    ? voitureService.getVoitureById(idVoiture) 
+                    : existingReservation.getVoiture();
+            if (voiture == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Car not found"));
+            }
+
+            // Récupérer la ville de destination si elle a été fournie
+            City endCity = (endCityId != null) 
+                    ? cityService.findById(endCityId) 
+                    : existingReservation.getEndCity();
+            if (endCity == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "End city not found"));
+            }
+
+            // Vérification de la disponibilité de la voiture dans la nouvelle période
+            boolean isAvailable = reservationService.isCarAvailable(
+                    voiture.getIdVoiture(), startDate, endDate, idReservation);
+            if (!isAvailable) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "The car is not available during the selected dates"));
+            }
+
+            // Mettre à jour la réservation avec les nouveaux détails
+            Reservation updatedReservation = reservationService.modifyReservation(
+                    idReservation, idVoiture, startDate, endDate, endCityId);
+
+            // Enregistrer ou mettre à jour le paiement associé
+            Payement existingPayement = payementRepository.findByReservation(updatedReservation);
+            if (existingPayement == null) {
+                existingPayement = new Payement();
+                existingPayement.setReservation(updatedReservation);
+            }
+            existingPayement.setAmount(amount);
+            payementRepository.save(existingPayement);
+
+            // Retourner la réponse
+            return ResponseEntity.ok(Map.of(
+                    "updatedReservation", updatedReservation,
+                    "newPayment", existingPayement
+            ));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "An error occurred: " + e.getMessage()));
+        }
+    }
 
 }

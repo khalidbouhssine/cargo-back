@@ -1,6 +1,7 @@
 package com.car.cargo.repository;
 
 
+import com.car.cargo.models.Client;
 import com.car.cargo.models.Reservation;
 import com.car.cargo.models.Voiture;
 
@@ -28,6 +29,19 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     // Trouver des réservations entre deux dates
     List<Reservation> findByStartDateBetween(LocalDateTime startDate, LocalDateTime endDate);
     
+    List<Reservation> findByIdClient(Client client);
     
+ // Trouver des réservations qui se chevauchent avec la période donnée (excluant une réservation par son ID)
+ // Trouver des réservations qui se chevauchent avec la période donnée (excluant une réservation par son ID)
+    // Trouver des réservations qui chevauchent avec la période donnée, excluant une réservation par son ID
+    @Query("SELECT r FROM Reservation r WHERE r.voiture.idVoiture = :voitureId " +
+           "AND (r.startDate BETWEEN :startDate AND :endDate OR r.endDate BETWEEN :startDate AND :endDate) " +
+           "AND r.idReservation != :excludedReservationId")
+    List<Reservation> findByVoitureIdVoitureAndStartDateBetween(@Param("voitureId") Long voitureId,
+                                                                @Param("startDate") LocalDateTime startDate,
+                                                                @Param("endDate") LocalDateTime endDate,
+                                                                @Param("excludedReservationId") Long excludedReservationId);
+
+ 
     
 }

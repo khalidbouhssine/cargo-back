@@ -1,5 +1,6 @@
 package com.car.cargo.services;
 import com.car.cargo.models.Payement;
+import com.car.cargo.models.Reservation;
 import com.car.cargo.repository.PayementRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,5 +42,10 @@ public class PayementService {
     }
 
 
+
+    // Méthode pour récupérer le paiement associé à une réservation
+    public Payement findByReservation(Reservation reservation) {
+        return payementRepository.findByReservation(reservation);
+    }
 }
 
