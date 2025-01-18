@@ -8,7 +8,9 @@ import com.car.cargo.models.Payement;
 import com.car.cargo.models.Reservation;
 import com.car.cargo.models.Voiture;
 import com.car.cargo.repository.AdminGlobalRepository;
+import com.car.cargo.repository.ClientRepository;
 import com.car.cargo.repository.PayementRepository;
+import com.car.cargo.repository.ReservationRepository;
 import com.car.cargo.services.AdminGlobalService;
 import com.car.cargo.services.AdminLocalService;
 import com.car.cargo.services.CityService;
@@ -67,6 +69,13 @@ public class ReservationController {
      
      @Autowired
      private AdminGlobalRepository adminGlobalRepository;
+     
+     @Autowired 
+     private ClientRepository clientRepository;
+     
+     @Autowired 
+     private ReservationRepository reservationRepository;
+     
      
      @Autowired
      private EmailService emailService;
@@ -605,6 +614,54 @@ public class ReservationController {
         }
     }
 
+////////////////////////////route pour faire la supression d'une reservation et son payement selon id 
+    @DeleteMapping("/deleteReservation/{id}")
+    public ResponseEntity<?> deleteReservation(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Long id) {
+        try {
+            // Vérifier et décoder le token
+            Claims claims = Jwts.parser()
+                    .setSigningKey(SECRET_KEY.getBytes())
+                    .parseClaimsJws(token.replace("Bearer ", ""))
+                    .getBody();
+
+            // Récupérer l'email depuis le token
+            String email = claims.getSubject();
+
+            // Vérifier si l'email appartient à un admin global ou si c'est le client associé à la réservation
+            AdminGlobal adminGlobal = adminGlobalRepository.findByEmail(email);
+            Client client = clientRepository.findByEmail(email);
+
+            // Récupérer la réservation par ID
+            Reservation reservation = reservationRepository.findById(id).orElse(null);
+            if (reservation == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Reservation not found"));
+            }
+
+            // Si l'utilisateur est un admin global ou le client propriétaire de la réservation
+            if (adminGlobal == null && (client == null || !reservation.getIdClient().getIdClient().equals(client.getIdClient()))) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Access denied"));
+            }
+
+            // Supprimer le paiement associé à la réservation
+            Payement payement = payementService.findByReservation(reservation);
+            if (payement != null) {
+                payementService.delete(payement); // Assurez-vous que cette méthode supprime le paiement de la base de données
+            }
+
+            // Supprimer la réservation
+            reservationRepository.delete(reservation);
+
+            return ResponseEntity.ok(Map.of("message", "Reservation and associated payment deleted successfully"));
+
+        } catch (JwtException | IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired token"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "An error occurred: " + e.getMessage()));
+        }
+    }
 
 
 }

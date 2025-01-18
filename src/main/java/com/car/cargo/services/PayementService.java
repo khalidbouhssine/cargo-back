@@ -47,5 +47,11 @@ public class PayementService {
     public Payement findByReservation(Reservation reservation) {
         return payementRepository.findByReservation(reservation);
     }
+    
+    public void delete(Payement payement) {
+        if (payement != null) {
+            payementRepository.delete(payement);
+        }
+    }
 }
 
