@@ -220,6 +220,59 @@ public class AdminLocalController {
         }
     }
 
+    
+    
+ // Supprimer un AdminLocal par ID
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<?> deleteAdminLocalById(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Long id) {
+        try {
+            // Vérifier si le token est présent et commence par "Bearer "
+            if (token == null || !token.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("message", "Token manquant ou invalide."));
+            }
+
+            // Décoder et valider le token
+            Claims claims;
+            try {
+                claims = Jwts.parser()
+                        .setSigningKey(SECRET_KEY.getBytes()) // Clé secrète
+                        .parseClaimsJws(token.replace("Bearer ", ""))
+                        .getBody();
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("message", "Token invalide."));
+            }
+
+            // Récupérer l'email depuis le token
+            String email = claims.getSubject();
+
+            // Vérifier si l'email appartient à un admin global
+            AdminGlobal adminGlobal = adminGlobalRepository.findByEmail(email);
+            if (adminGlobal == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("message", "Accès refusé : seuls les administrateurs globaux peuvent supprimer un administrateur local."));
+            }
+
+            // Vérifier si l'ID de l'AdminLocal existe
+            AdminLocal adminLocal = adminLocalService.findById(id);
+            if (adminLocal == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("message", "Administrateur local introuvable."));
+            }
+
+            // Supprimer l'AdminLocal
+            adminLocalService.deleteAdminLocalById(id);
+            return ResponseEntity.ok(Map.of("message", "Administrateur local supprimé avec succès."));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Une erreur s'est produite lors de la suppression de l'administrateur local."));
+        }
+    }
+
 
     
 }

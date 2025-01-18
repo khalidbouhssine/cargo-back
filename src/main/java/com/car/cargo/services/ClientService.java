@@ -57,4 +57,14 @@ public class ClientService {
 
         return result;
     }
+    
+    
+    public boolean deleteClientById(Long id) {
+        if (clientRepository.existsById(id)) {
+            clientRepository.deleteById(id);
+            return true;
+        }
+        return false;
+    }
+
 }

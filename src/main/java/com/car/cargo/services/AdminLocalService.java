@@ -2,6 +2,7 @@ package com.car.cargo.services;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -96,6 +97,20 @@ public class AdminLocalService {
         return result;
     }
 
+
+    public AdminLocal findById(Long id) {
+        Optional<AdminLocal> adminLocal = adminLocalRepository.findById(id);
+        return adminLocal.orElse(null); // Retourne null si l'AdminLocal n'existe pas
+    }
+    
+ // Supprimer un AdminLocal par ID
+    public void deleteAdminLocalById(Long id) {
+        if (adminLocalRepository.existsById(id)) {
+            adminLocalRepository.deleteById(id); // Supprime si l'ID existe
+        } else {
+            throw new IllegalArgumentException("AdminLocal avec l'ID " + id + " n'existe pas."); // Lève une exception si l'ID est introuvable
+        }
+    }
 
 
 }
