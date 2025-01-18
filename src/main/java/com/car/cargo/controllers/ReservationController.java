@@ -7,6 +7,7 @@ import com.car.cargo.models.Client;
 import com.car.cargo.models.Payement;
 import com.car.cargo.models.Reservation;
 import com.car.cargo.models.Voiture;
+import com.car.cargo.repository.AdminGlobalRepository;
 import com.car.cargo.repository.PayementRepository;
 import com.car.cargo.services.AdminGlobalService;
 import com.car.cargo.services.AdminLocalService;
@@ -22,7 +23,9 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.hibernate.query.Page;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -61,6 +64,9 @@ public class ReservationController {
      
      @Autowired
      private PayementRepository payementRepository;
+     
+     @Autowired
+     private AdminGlobalRepository adminGlobalRepository;
      
      @Autowired
      private EmailService emailService;
@@ -564,5 +570,41 @@ public class ReservationController {
                     .body(Map.of("error", "An error occurred: " + e.getMessage()));
         }
     }
+    /////////////////////////////recupere toutes les reservation exsistent par admin Gloabal //////
+   
+    @GetMapping("/allReservations")
+    public ResponseEntity<?> getAllReservations(
+            @RequestHeader("Authorization") String token,
+            @RequestParam int page,
+            @RequestParam int size) {
+        try {
+            // Vérifier et décoder le token
+            Claims claims = Jwts.parser()
+                    .setSigningKey(SECRET_KEY.getBytes())
+                    .parseClaimsJws(token.replace("Bearer ", ""))
+                    .getBody();
+
+            // Récupérer l'email depuis le token
+            String email = claims.getSubject();
+
+            // Vérifier si l'email appartient à un admin global
+            AdminGlobal adminGlobal = adminGlobalRepository.findByEmail(email);
+            if (adminGlobal == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Access denied, not an admin"));
+            }
+
+            // Récupérer les réservations avec pagination
+            Map<String, Object> result = reservationService.getReservationsWithPagination(page, size);
+
+            return ResponseEntity.ok(result); // Retourner la réponse paginée des réservations
+
+        } catch (JwtException | IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired token"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "An error occurred while fetching reservations"));
+        }
+    }
+
+
 
 }

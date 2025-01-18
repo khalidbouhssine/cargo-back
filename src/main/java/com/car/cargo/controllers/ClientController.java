@@ -317,42 +317,7 @@ public class ClientController {
         }
     }
 
-    // delete a client by admin global
-    @DeleteMapping("/delete/{id}")
-    public ResponseEntity<?> deleteClientById(
-            @PathVariable Long id,
-            @RequestHeader("Authorization") String token) {
-        try {
-            // Vérifier et décoder le token
-            Claims claims = Jwts.parser()
-                    .setSigningKey(SECRET_KEY.getBytes())
-                    .parseClaimsJws(token.replace("Bearer ", ""))
-                    .getBody();
-
-            // Récupérer l'email depuis le token
-            String email = claims.getSubject();
-
-            // Vérifier si l'utilisateur est un AdminGlobal
-            AdminGlobal adminGlobal = adminGlobalRepository.findByEmail(email);
-            if (adminGlobal == null) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Access denied, not an AdminGlobal"));
-            }
-
-            // Supprimer le client par son ID
-            boolean deleted = clientService.deleteClientById(id);
-            if (deleted) {
-                return ResponseEntity.ok(Map.of("message", "Client supprimé avec succès"));
-            } else {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Client introuvable avec l'ID " + id));
-            }
-
-        } catch (JwtException | IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired token"));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
-        }
-    }
-
+   
 
 
 }

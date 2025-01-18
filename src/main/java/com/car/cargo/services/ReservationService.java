@@ -1,18 +1,25 @@
 package com.car.cargo.services;
 
 import com.car.cargo.models.Client;
+import com.car.cargo.models.Payement;
 import com.car.cargo.models.Reservation;
+import com.car.cargo.models.Voiture;
 import com.car.cargo.repository.CityRepository;
 import com.car.cargo.repository.ReservationRepository;
 import com.car.cargo.repository.VoitureRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class ReservationService {
@@ -20,12 +27,16 @@ public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final VoitureRepository voitureRepository;
     private final CityRepository cityRepository;
+     
+   
+   private final PayementService payementService;
 
     @Autowired
-    public ReservationService(ReservationRepository reservationRepository,VoitureRepository voitureRepository,CityRepository cityRepository) {
+    public ReservationService(ReservationRepository reservationRepository,VoitureRepository voitureRepository,CityRepository cityRepository,PayementService payementService) {
         this.reservationRepository = reservationRepository;
         this.voitureRepository = voitureRepository;
         this.cityRepository=cityRepository;
+        this.payementService =payementService;
     }
 
     // Créer une nouvelle réservation
@@ -123,6 +134,60 @@ public class ReservationService {
         }
     }
 
+///////////////////////////////////////////////////
+    public Map<String, Object> getReservationsWithPagination(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Reservation> reservationsPage = reservationRepository.findAll(pageable);
+
+        // Créer une liste contenant uniquement les champs désirés pour les réservations
+        List<Map<String, Object>> reservationsList = reservationsPage.getContent().stream()
+            .map(reservation -> {
+                Map<String, Object> reservationMap = new HashMap<>();
+                reservationMap.put("idReservation", reservation.getIdReservation());
+
+                // Ajouter les informations sur la voiture
+                Voiture voiture = reservation.getVoiture();
+                Map<String, Object> voitureMap = new HashMap<>();
+                voitureMap.put("idVoiture", voiture.getIdVoiture());
+                voitureMap.put("brand", voiture.getBrand());
+                voitureMap.put("model", voiture.getModel());
+                voitureMap.put("licenceplate", voiture.getLicenceplate());
+                voitureMap.put("pricePerDay", voiture.getPricePerDay());
+
+                reservationMap.put("voiture", voitureMap);
+
+                // Ajouter les informations des villes de départ et d'arrivée (uniquement le nom)
+                Map<String, Object> startCityMap = Map.of("nameCity", reservation.getStartCity().getNameCity());
+                Map<String, Object> endCityMap = Map.of("nameCity", reservation.getEndCity().getNameCity());
+
+                reservationMap.put("startCity", startCityMap);
+                reservationMap.put("endCity", endCityMap);
+
+                // Ajouter les dates de début et de fin, ainsi que le statut
+                reservationMap.put("startDate", reservation.getStartDate());
+                reservationMap.put("endDate", reservation.getEndDate());
+                reservationMap.put("status", reservation.getStatus());
+
+                // Récupérer le paiement associé à la réservation
+                Payement payement = payementService.findByReservation(reservation);
+                if (payement != null) {
+                    reservationMap.put("amount", payement.getAmount());
+                } else {
+                    reservationMap.put("amount", "No payment found");
+                }
+
+                return reservationMap;
+            })
+            .collect(Collectors.toList());
+
+        // Créer la réponse avec la pagination
+        Map<String, Object> result = new HashMap<>();
+        result.put("reservations", reservationsList);
+        result.put("totalElements", reservationsPage.getTotalElements());
+        result.put("totalPages", reservationsPage.getTotalPages());
+
+        return result;
+    }
 
     
 }

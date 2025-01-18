@@ -5,6 +5,8 @@ import com.car.cargo.models.Client;
 import com.car.cargo.models.Reservation;
 import com.car.cargo.models.Voiture;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -43,5 +45,6 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
                                                                 @Param("excludedReservationId") Long excludedReservationId);
 
  
+    
     
 }
