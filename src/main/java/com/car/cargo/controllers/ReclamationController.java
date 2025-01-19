@@ -1,5 +1,6 @@
 package com.car.cargo.controllers;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -118,6 +119,51 @@ public class ReclamationController {
 	        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired token"));
 	    } catch (Exception e) {
 	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "An error occurred while fetching reclamations"));
+	    }
+	}
+	@GetMapping("/reclamationDetails")
+	public ResponseEntity<?> getReclamationDetails(
+	        @RequestHeader("Authorization") String token,
+	        @RequestParam Long idReclamation) {
+	    try {
+	        // Vérifier et décoder le token
+	        Claims claims = Jwts.parser()
+	                .setSigningKey(SECRET_KEY.getBytes())
+	                .parseClaimsJws(token.replace("Bearer ", ""))
+	                .getBody();
+
+	        // Récupérer l'email depuis le token
+	        String email = claims.getSubject();
+
+	        // Vérifier si l'email appartient à un admin global
+	        AdminGlobal adminGlobal = adminGlobalRepository.findByEmail(email);
+	        if (adminGlobal == null) {
+	            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Access denied, not an admin"));
+	        }
+
+	        // Récupérer la réclamation par idReclamation
+	        Reclamation reclamation = reclamationService.findById(idReclamation);
+	        if (reclamation == null) {
+	            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Reclamation not found"));
+	        }
+
+	        // Récupérer le client associé à la réclamation
+	        Client client = reclamation.getClient();
+
+	        // Créer la réponse avec les détails de la réclamation
+	        Map<String, Object> response = new HashMap<>();
+	        response.put("idReclamation", reclamation.getIdReclamation());
+	        response.put("objetReclamation", reclamation.getObjetReclamation());
+	        response.put("message", reclamation.getMessage());
+	        response.put("telephone", reclamation.getTelephone());
+	        response.put("nomCompletClient", client.getNomComplet()); // Nom du client
+
+	        return ResponseEntity.ok(response);
+
+	    } catch (JwtException | IllegalArgumentException e) {
+	        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired token"));
+	    } catch (Exception e) {
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "An error occurred while fetching reclamation details"));
 	    }
 	}
 

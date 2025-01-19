@@ -3,6 +3,7 @@ package com.car.cargo.services;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +60,11 @@ public class ReclamationService {
 	        result.put("totalPages", reclamationsPage.getTotalPages());
 
 	        return result;
+	    }
+
+	    public Reclamation findById(Long idReclamation) {
+	        Optional<Reclamation> reclamationOpt = reclamationRepository.findById(idReclamation);
+	        return reclamationOpt.orElse(null); // Retourne null si la réclamation n'existe pas
 	    }
 
 
