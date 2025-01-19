@@ -33,6 +33,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -787,6 +788,131 @@ public class ReservationController {
                     "message", "Reservation confirmed successfully",
                     "reservationId", reservation.getIdReservation()
             ));
+
+        } catch (JwtException | IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired token"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "An error occurred: " + e.getMessage()));
+        }
+    }
+
+    ////////////////////////filter reservation selon les horaires/////////////////////////////////
+    @PostMapping("/myReservations/filter")
+    public ResponseEntity<?> getFilteredClientReservations(
+            HttpServletRequest request,
+            @RequestBody Map<String, String> dateFilters) {
+        try {
+            // Récupérer et valider le token JWT
+            String token = request.getHeader("Authorization");
+            if (token == null || !token.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Token is missing or invalid"));
+            }
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(SECRET_KEY.getBytes())
+                    .parseClaimsJws(token.replace("Bearer ", ""))
+                    .getBody();
+            String email = claims.getSubject();
+
+            // Récupérer le client à partir de son email
+            Client client = clientService.findByEmail(email);
+            if (client == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Client not found"));
+            }
+
+            // Récupérer les dates depuis le corps de la requête
+            String startDate = dateFilters.get("startDate");
+            String endDate = dateFilters.get("endDate");
+
+            // Conversion des dates de String à LocalDateTime
+            LocalDateTime startDateFilter = startDate != null ? LocalDateTime.parse(startDate) : null;
+            LocalDateTime endDateFilter = endDate != null ? LocalDateTime.parse(endDate) : null;
+
+            // Récupérer les réservations du client
+            List<Reservation> reservations = reservationService.findByClient(client);
+
+            // Filtrage des réservations par dates
+            List<Reservation> filteredReservations = reservations.stream()
+                    .filter(reservation -> {
+                        LocalDateTime reservationStartDate = reservation.getStartDate();
+                        LocalDateTime reservationEndDate = reservation.getEndDate();
+
+                        boolean startMatches = (startDateFilter == null || !reservationStartDate.isBefore(startDateFilter));
+                        boolean endMatches = (endDateFilter == null || !reservationEndDate.isAfter(endDateFilter));
+
+                        return startMatches && endMatches;
+                    })
+                    .toList();
+
+            // Si aucune réservation ne correspond au filtre
+            if (filteredReservations.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "No reservations found for the specified date range"));
+            }
+
+            // Préparer la réponse personnalisée pour les réservations filtrées
+            RestTemplate restTemplate = new RestTemplate();
+            List<Map<String, Object>> customReservations = filteredReservations.stream().map(reservation -> {
+                Map<String, Object> reservationMap = new HashMap<>();
+                reservationMap.put("idReservation", reservation.getIdReservation());
+
+                // Ajouter les informations sur la voiture
+                Voiture voiture = reservation.getVoiture();
+                Map<String, Object> voitureMap = new HashMap<>();
+                voitureMap.put("idVoiture", voiture.getIdVoiture());
+                voitureMap.put("brand", voiture.getBrand());
+                voitureMap.put("model", voiture.getModel());
+                voitureMap.put("licenceplate", voiture.getLicenceplate());
+                voitureMap.put("pricePerDay", voiture.getPricePerDay());
+
+                // Vérification et récupération du nom de l'image
+                if (voiture.getImagevoiture() != null) {
+                    Long imageId = voiture.getImagevoiture();
+                    String imageUrl = "http://localhost:8081/api/image/" + imageId;
+
+                    try {
+                        ResponseEntity<Map> response = restTemplate.getForEntity(imageUrl, Map.class);
+                        if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                            String imageName = (String) response.getBody().get("message");
+                            voitureMap.put("imageName", imageName);
+                        } else {
+                            voitureMap.put("imageName", "Image not found");
+                        }
+                    } catch (Exception e) {
+                        voitureMap.put("imageName", "Error fetching image");
+                    }
+                } else {
+                    voitureMap.put("imageName", "No image ID provided");
+                }
+
+                reservationMap.put("voiture", voitureMap);
+
+                // Ajouter les informations des villes de départ et d'arrivée (uniquement le nom)
+                Map<String, Object> startCityMap = Map.of("nameCity", reservation.getStartCity().getNameCity());
+                Map<String, Object> endCityMap = Map.of("nameCity", reservation.getEndCity().getNameCity());
+
+                reservationMap.put("startCity", startCityMap);
+                reservationMap.put("endCity", endCityMap);
+
+                // Ajouter les dates de début et de fin, ainsi que le statut
+                reservationMap.put("startDate", reservation.getStartDate());
+                reservationMap.put("endDate", reservation.getEndDate());
+                reservationMap.put("status", reservation.getStatus());
+
+                // Récupérer le paiement associé à la réservation
+                Payement payement = payementService.findByReservation(reservation);
+                if (payement != null) {
+                    reservationMap.put("amount", payement.getAmount());
+                } else {
+                    reservationMap.put("amount", "No payment found");
+                }
+
+                return reservationMap;
+            }).toList();
+
+            // Retourner les réservations personnalisées filtrées
+            return ResponseEntity.ok(customReservations);
 
         } catch (JwtException | IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired token"));
