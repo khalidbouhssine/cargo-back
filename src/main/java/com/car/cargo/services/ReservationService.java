@@ -190,4 +190,22 @@ public class ReservationService {
     }
 
     
+    
+    
+    public Reservation updateReservation(Reservation reservation) {
+        if (reservation == null || reservation.getIdReservation() == null) {
+            throw new IllegalArgumentException("Reservation or its ID cannot be null");
+        }
+
+        // Vérifier si la réservation existe dans la base de données
+        Optional<Reservation> existingReservation = reservationRepository.findById(reservation.getIdReservation());
+        if (existingReservation.isEmpty()) {
+            throw new IllegalArgumentException("Reservation with ID " + reservation.getIdReservation() + " does not exist");
+        }
+
+        // Mettre à jour et sauvegarder la réservation
+        return reservationRepository.save(reservation);
+    }
+    
+    
 }

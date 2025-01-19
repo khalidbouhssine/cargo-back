@@ -727,5 +727,74 @@ public class ReservationController {
     }
 
 
+    /////////////////////////////////////////////Reservation confirmation route////////////////////////////////////
+    @PutMapping("/confirmReservation/{idReservation}")
+    public ResponseEntity<?> confirmReservation(
+            @PathVariable Long idReservation,
+            @RequestHeader("Authorization") String token) {
+        try {
+            // Décoder le token JWT
+            Claims claims = Jwts.parser()
+                    .setSigningKey(SECRET_KEY.getBytes())
+                    .parseClaimsJws(token.replace("Bearer ", ""))
+                    .getBody();
+
+            // Vérifier si l'utilisateur est un admin global
+            String email = claims.getSubject();
+            AdminGlobal adminGlobal = adminGlobalRepository.findByEmail(email);
+            if (adminGlobal == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Access denied, not an admin global"));
+            }
+
+            // Récupérer la réservation par ID
+            Reservation reservation = reservationService.findById(idReservation);
+            if (reservation == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Reservation not found"));
+            }
+
+            // Vérifier si la réservation est déjà confirmée
+            if ("Confirmed".equalsIgnoreCase(reservation.getStatus())) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Reservation is already confirmed"));
+            }
+
+            // Mettre à jour le statut de la réservation
+            reservation.setStatus("Confirmed");
+            reservationService.updateReservation(reservation);
+
+            // Récupérer les informations du client
+            Client client = reservation.getIdClient();
+            if (client == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Client associated with this reservation not found"));
+            }
+
+            // Envoyer un email au client
+            String subject = "Your Reservation Confirmation";
+            String body = String.format("Hello Mr. %s, your reservation for the car %s (%s) with registration number %s " +
+                            "has been confirmed. The reservation is scheduled from %s to %s, from %s to %s.\n\nCarGo Foundation",
+                    client.getNomComplet(),
+                    reservation.getVoiture().getBrand(),
+                    reservation.getVoiture().getModel(),
+                    reservation.getVoiture().getLicenceplate(),
+                    reservation.getStartDate().toLocalDate(),
+                    reservation.getEndDate().toLocalDate(),
+                    reservation.getStartCity().getNameCity(),
+                    reservation.getEndCity().getNameCity());
+
+            emailService.sendEmail(client.getEmail(), subject, body);
+
+            // Réponse réussie
+            return ResponseEntity.ok(Map.of(
+                    "message", "Reservation confirmed successfully",
+                    "reservationId", reservation.getIdReservation()
+            ));
+
+        } catch (JwtException | IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired token"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "An error occurred: " + e.getMessage()));
+        }
+    }
+
 
 }
