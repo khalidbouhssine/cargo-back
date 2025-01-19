@@ -14,12 +14,20 @@ import org.springframework.stereotype.Service;
 
 import com.car.cargo.models.Client;
 import com.car.cargo.repository.ClientRepository;
+import com.car.cargo.repository.ReclamationRepository;
+import com.car.cargo.repository.ReservationRepository;
 
 @Service
 public class ClientService {
 	
     @Autowired
     private ClientRepository clientRepository;
+    
+    @Autowired
+    private ReclamationRepository reclamationRepository;
+    
+    @Autowired
+    private ReservationRepository reservationRepository;
 
     public Client addClient(Client client) {
         return clientRepository.save(client); // Enregistre le client dans la base de données
@@ -65,6 +73,14 @@ public class ClientService {
             return true;
         }
         return false;
+    }
+    
+    public int getReservationCountByClient(Client client) {
+        return reservationRepository.countByIdClient(client);
+    }
+    
+    public int getReclamationCountByClient(Client client) {
+        return reclamationRepository.countByClient(client);
     }
 
 }

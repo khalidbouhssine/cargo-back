@@ -317,7 +317,47 @@ public class ClientController {
         }
     }
 
-   
+   //recupere les info de client c'est a dire le profile 
+    @GetMapping("/profileWithCounts")
+    public ResponseEntity<?> getClientProfileWithCounts(@RequestHeader("Authorization") String token) {
+        try {
+            // Vérifier et décoder le token
+            Claims claims = Jwts.parser()
+                    .setSigningKey(SECRET_KEY.getBytes())
+                    .parseClaimsJws(token.replace("Bearer ", ""))
+                    .getBody();
+
+            // Récupérer l'email depuis le token
+            String email = claims.getSubject();
+
+            // Récupérer le client par email
+            Client client = clientService.findByEmail(email);
+            if (client == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Client not found"));
+            }
+
+            // Récupérer les compteurs pour ce client
+            int reservationCount = clientService.getReservationCountByClient(client);
+            int reclamationCount = clientService.getReclamationCountByClient(client);
+
+            // Créer une réponse incluant les informations client + compteurs
+            Map<String, Object> response = new HashMap<>();
+            response.put("nomComplet", client.getNomComplet());
+            response.put("email", client.getEmail());
+            response.put("cin", client.getCin());
+            response.put("city", client.getCity());
+            response.put("addresse", client.getAddresse());
+            response.put("reservationCount", reservationCount);
+            response.put("reclamationCount", reclamationCount);
+
+            return ResponseEntity.ok(response);
+        } catch (JwtException | IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired token"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
 
 
 }
